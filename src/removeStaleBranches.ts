@@ -246,6 +246,16 @@ type Details = Record<
   { branchName: string; author: string | null; lastUpdated: number }[]
 >;
 
+function safeRegExp(pattern: string, inputName: string): RegExp {
+  try {
+    return new RegExp(pattern);
+  } catch (e) {
+    throw new Error(
+      `Invalid regular expression for input '${inputName}': ${pattern} — ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+}
+
 export async function removeStaleBranches(
   octokit: Octokit,
   params: Params,
@@ -261,13 +271,13 @@ export async function removeStaleBranches(
   const staleCutoff = subDays(now, params.daysBeforeBranchStale).getTime();
   const removeCutoff = subDays(now, params.daysBeforeBranchDelete).getTime();
   const authorsRegex = params.protectedAuthorsRegex
-    ? new RegExp(params.protectedAuthorsRegex)
+    ? safeRegExp(params.protectedAuthorsRegex, "exempt-authors-regex")
     : null;
   const allowedBranchesRegex = params.selectedBranchesRegex
-    ? new RegExp(params.selectedBranchesRegex)
+    ? safeRegExp(params.selectedBranchesRegex, "restrict-branches-regex")
     : null;
   const deniedBranchesRegex = params.protectedBranchesRegex
-    ? new RegExp(params.protectedBranchesRegex)
+    ? safeRegExp(params.protectedBranchesRegex, "exempt-branches-regex")
     : null;
   const repo = params.repo;
 

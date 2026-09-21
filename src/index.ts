@@ -56,12 +56,18 @@ async function validateSubscription() {
 function getRunConfig(): Params {
   const isDryRun = core.getBooleanInput("dry-run", { required: false });
   const repositoryInput = core.getInput("repository", { required: false });
-  const repo = repositoryInput
-    ? {
-        owner: repositoryInput.split("/")[0],
-        repo: repositoryInput.split("/")[1],
-      }
-    : github.context.repo;
+  let repo: { owner: string; repo: string };
+  if (repositoryInput) {
+    const parts = repositoryInput.split("/");
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+      throw new Error(
+        `Invalid repository input '${repositoryInput}': expected format 'owner/repo'`,
+      );
+    }
+    repo = { owner: parts[0], repo: parts[1] };
+  } else {
+    repo = github.context.repo;
+  }
   const protectedOrganizationName = core.getInput("exempt-organization", {
     required: false,
   });
@@ -97,7 +103,16 @@ function getRunConfig(): Params {
     core.getInput("default-recipient", { required: false }) ?? "";
 
   const remapAuthorsInput = core.getInput("remap-authors", { required: false });
-  const remapAuthors = remapAuthorsInput ? JSON.parse(remapAuthorsInput) : {};
+  let remapAuthors: unknown = {};
+  if (remapAuthorsInput) {
+    try {
+      remapAuthors = JSON.parse(remapAuthorsInput);
+    } catch (e) {
+      throw new Error(
+        `Invalid JSON for input 'remap-authors': ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
   if (
     !remapAuthors ||
     Array.isArray(remapAuthors) ||

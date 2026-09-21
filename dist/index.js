@@ -20104,6 +20104,13 @@ function logActionRunConfiguration(params, staleCutoff, removeCutoff) {
 	if (params.daysBeforeBranchDelete == 0) console.log("Branches will be instantly removed due to days-before-branch-delete being set to 0.");
 	else console.log(`Branches marked stale before ${formatISO(removeCutoff)} will be removed`);
 }
+function safeRegExp(pattern, inputName) {
+	try {
+		return new RegExp(pattern);
+	} catch (e) {
+		throw new Error(`Invalid regular expression for input '${inputName}': ${pattern} — ${e instanceof Error ? e.message : String(e)}`);
+	}
+}
 async function removeStaleBranches(octokit, params) {
 	const headers = params.githubToken ? {
 		"Content-Type": "application/json",
@@ -20112,9 +20119,9 @@ async function removeStaleBranches(octokit, params) {
 	const now = /* @__PURE__ */ new Date();
 	const staleCutoff = subDays(now, params.daysBeforeBranchStale).getTime();
 	const removeCutoff = subDays(now, params.daysBeforeBranchDelete).getTime();
-	const authorsRegex = params.protectedAuthorsRegex ? new RegExp(params.protectedAuthorsRegex) : null;
-	const allowedBranchesRegex = params.selectedBranchesRegex ? new RegExp(params.selectedBranchesRegex) : null;
-	const deniedBranchesRegex = params.protectedBranchesRegex ? new RegExp(params.protectedBranchesRegex) : null;
+	const authorsRegex = params.protectedAuthorsRegex ? safeRegExp(params.protectedAuthorsRegex, "exempt-authors-regex") : null;
+	const allowedBranchesRegex = params.selectedBranchesRegex ? safeRegExp(params.selectedBranchesRegex, "restrict-branches-regex") : null;
+	const deniedBranchesRegex = params.protectedBranchesRegex ? safeRegExp(params.protectedBranchesRegex, "exempt-branches-regex") : null;
 	const repo = params.repo;
 	const filters = {
 		staleCutoff,
@@ -35634,10 +35641,15 @@ async function validateSubscription() {
 function getRunConfig() {
 	const isDryRun = getBooleanInput("dry-run", { required: false });
 	const repositoryInput = getInput("repository", { required: false });
-	const repo = repositoryInput ? {
-		owner: repositoryInput.split("/")[0],
-		repo: repositoryInput.split("/")[1]
-	} : context.repo;
+	let repo;
+	if (repositoryInput) {
+		const parts = repositoryInput.split("/");
+		if (parts.length !== 2 || !parts[0] || !parts[1]) throw new Error(`Invalid repository input '${repositoryInput}': expected format 'owner/repo'`);
+		repo = {
+			owner: parts[0],
+			repo: parts[1]
+		};
+	} else repo = context.repo;
 	const protectedOrganizationName = getInput("exempt-organization", { required: false });
 	const selectedBranchesRegex = getInput("restrict-branches-regex", { required: false });
 	const protectedBranchesRegex = getInput("exempt-branches-regex", { required: false });
@@ -35649,8 +35661,15 @@ function getRunConfig() {
 	const operationsPerRun = Number.parseInt(getInput("operations-per-run", { required: false }));
 	const defaultRecipient = getInput("default-recipient", { required: false }) ?? "";
 	const remapAuthorsInput = getInput("remap-authors", { required: false });
-	const remapAuthors = remapAuthorsInput ? JSON.parse(remapAuthorsInput) : {};
+	let remapAuthors = {};
+	if (remapAuthorsInput) try {
+		remapAuthors = JSON.parse(remapAuthorsInput);
+	} catch (e) {
+		throw new Error(`Invalid JSON for input 'remap-authors': ${e instanceof Error ? e.message : String(e)}`);
+	}
 	if (!remapAuthors || Array.isArray(remapAuthors) || typeof remapAuthors !== "object") throw new Error("unexpected input: remap-authors is not a json object");
+	const ignoreUnknownAuthors = getBooleanInput("ignore-unknown-authors", { required: false });
+	const ignoreBranchesWithOpenPRs = getBooleanInput("ignore-branches-with-open-prs", { required: false });
 	return {
 		isDryRun,
 		repo,
@@ -35665,8 +35684,8 @@ function getRunConfig() {
 		operationsPerRun,
 		defaultRecipient,
 		remapAuthors,
-		ignoreUnknownAuthors: getBooleanInput("ignore-unknown-authors", { required: false }),
-		ignoreBranchesWithOpenPRs: getBooleanInput("ignore-branches-with-open-prs", { required: false })
+		ignoreUnknownAuthors,
+		ignoreBranchesWithOpenPRs
 	};
 }
 async function run() {
