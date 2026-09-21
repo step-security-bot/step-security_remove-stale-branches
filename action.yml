@@ -1,0 +1,128 @@
+name: "Remove Stale Branches"
+description: "Cleanup stale branches from a repository"
+author: 'step-security'
+branding:
+  icon: user-x
+  color: green
+runs:
+  using: "node24"
+  main: "dist/index.js"
+inputs:
+  github-token:
+    description: "PAT for GitHub API authentication."
+    required: false
+    default: ${{ github.token }}
+  dry-run:
+    description: >
+      Flag that prevents this action from doing any modification to the
+      repository.
+    required: false
+    default: "false"
+  exempt-organization:
+    description: >
+      Name of a GitHub organization. Branches for which the latest committer
+      belongs to this organization will be exempt from cleanup.
+    required: false
+  restrict-branches-regex:
+    description: >
+      Regular expression defining branch names that are eligible for cleanup.
+      Defaults to all.
+    required: false
+  exempt-branches-regex:
+    description: >
+      Regular expression defining branch names that are exempt from cleanup,
+      out of the ones selected for cleanup using `restrict-branches-regex`.
+      Defaults to `^(main|master)$`.
+    required: false
+    default: "^(main|master)$"
+  exempt-protected-branches:
+    description: "Whether protected branches are exempted"
+    required: false
+    default: "true"
+  exempt-authors-regex:
+    description: >
+      Regular expression defining authors who are exempt from cleanup. By
+      default, no author is exempted.
+    required: false
+  stale-branch-message:
+    description: >
+      Template for commit comments notifying the author that their branch will
+      be removed.
+    # Note: the following uses a YAML block scalar to ease editing. You need to
+    # use extra blank lines to enforce newlines.
+    default: >
+      @{author} Your branch [{branchName}]({branchUrl}) hasn't been updated in
+      the last {daysBeforeBranchStale} days and is marked as stale. It will be
+      removed in {daysBeforeBranchDelete} days.
+
+
+      If you want to keep this branch around, add new commits to this branch or
+      protect it. To generate an empty commit to keep the branch alive, run the
+      following commands:
+
+
+      ```bash
+
+      git switch {branchName}
+
+      git commit --allow-empty -m 'Keep branch alive'
+
+      git push
+
+      ```
+    required: false
+  days-before-branch-stale:
+    description: >
+      Number of days since the last commit before a branch is considered stale.
+      Once stale, this action will leave a comment on the last commit, marking
+      the branch as stale.
+    default: "90"
+    required: false
+  days-before-branch-delete:
+    description: "Number of days before a stale branch is removed."
+    default: "7"
+    required: false
+  operations-per-run:
+    description: >
+      Maximum number of stale branches to look at in any run of this action.
+    default: "10"
+    required: false
+  ignore-unknown-authors:
+    description: >
+      Whether to abort early when a commit author cannot be identified. By
+      default, stop early since this may indicate that the token used to run the
+      action doesn't have the right privileges. Set to true and define a default
+      recipient instead if not a concern.
+    default: "false"
+    required: false
+  default-recipient:
+    description: >
+      A string corresponding to the username to be tagged on stale branches from
+      unknown authors
+    default: ""
+    required: false
+  ignore-branches-with-open-prs:
+    description: "Whether to ignore branches with open pull requests."
+    default: "false"
+    required: false
+  remap-authors:
+    description: "A JSON mapping overriding some commit authors to GitHub usernames. The remapped names will be used in the comments."
+    required: false
+  repository:
+    description: >
+      Target repository in the format `owner/repo`. Defaults to the repository
+      the workflow is running in.
+    required: false
+outputs:
+  scanned_branches:
+    description: 'Total number of branches scanned'
+  removed_branches:
+    description: 'JSON list of deleted branches'
+  removed_branches_count:
+    description: 'Total count of deleted branches'
+  new_stale_branches:
+    description: 'JSON list of newly stale branches'
+  new_stale_branches_count:
+    description: 'Total count of newly stale branches'
+  existing_stale_branches_count:
+    description: 'Total count of existing stale branches'
