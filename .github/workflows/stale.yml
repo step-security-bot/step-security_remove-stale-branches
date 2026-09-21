@@ -7,6 +7,9 @@ jobs:
     name: Cleanup stale branches
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - uses: ./
         with:
           days-before-branch-stale: 15
