@@ -1,0 +1,16 @@
+name: 'Remove stale branches'
+on:
+  pull_request:
+
+jobs:
+  stale-branches:
+    name: Cleanup stale branches
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - uses: ./
+        with:
+          days-before-branch-stale: 15
+          dry-run: true
